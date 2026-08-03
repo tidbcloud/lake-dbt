@@ -10,3 +10,5 @@
 - Connections are made through the [tidbcloudlake-driver](https://github.com/tidbcloud/lakesql/tree/main/bindings/python)
   Python binding using a `lake://` DSN.
 - Added an optional `warehouse` profile option.
+- `dbt docs generate` now produces a full catalog: column names, ordinals and
+  types, plus table type, comment and owner.
