@@ -48,6 +48,8 @@ $ pip install .
 Note:
 
 * `Ephemeral` materialization is not supported.
+* `dbt docs generate` lists tables and views but the catalog carries no
+  column-level detail or table owner.
 
 ## Profile Configuration
 
