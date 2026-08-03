@@ -1,4 +1,4 @@
-# Testing dbt-tidbcloudlake
+# Testing tidbcloudlake-dbt
 
 ## Overview
 

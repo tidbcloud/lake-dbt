@@ -1,9 +1,9 @@
-# dbt-tidbcloudlake
+# tidbcloudlake-dbt
 
-![PyPI](https://img.shields.io/pypi/v/dbt-tidbcloudlake)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/dbt-tidbcloudlake)
+![PyPI](https://img.shields.io/pypi/v/tidbcloudlake-dbt)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/tidbcloudlake-dbt)
 
-The `dbt-tidbcloudlake` package contains all of the code enabling [dbt](https://getdbt.com) to work with
+The `tidbcloudlake-dbt` package contains all of the code enabling [dbt](https://getdbt.com) to work with
 TiDB Cloud Lake. It talks to the server through
 [tidbcloudlake-driver](https://github.com/tidbcloud/lakesql/tree/main/bindings/python).
 
@@ -19,7 +19,7 @@ TiDB Cloud Lake. It talks to the server through
 From PyPI:
 
 ```bash
-$ pip install dbt-tidbcloudlake
+$ pip install tidbcloudlake-dbt
 ```
 
 Or from source:
@@ -94,4 +94,4 @@ See [tests/README.md](tests/README.md) for details on running the integration te
 
 ## Contributing
 
-Welcome to contribute for dbt-tidbcloudlake. See [Contributing Guide](CONTRIBUTING.md) for more information.
+Welcome to contribute for tidbcloudlake-dbt. See [Contributing Guide](CONTRIBUTING.md) for more information.

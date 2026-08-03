@@ -1,6 +1,6 @@
-# dbt-tidbcloudlake Changelog
+# tidbcloudlake-dbt Changelog
 
-- This file provides a full account of all changes to `dbt-tidbcloudlake`.
+- This file provides a full account of all changes to `tidbcloudlake-dbt`.
 - Changes are listed under the (pre)release in which they first appear. Subsequent releases include changes from previous releases.
 - "Breaking changes" listed under a version may require action from end users or external maintainers when upgrading to that version.
 

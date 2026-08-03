@@ -3,7 +3,7 @@ import os
 
 from setuptools import find_namespace_packages, setup
 
-package_name = "dbt-tidbcloudlake"
+package_name = "tidbcloudlake-dbt"
 # make sure this always matches dbt/adapters/{adapter}/__version__.py
 package_version = "1.8.1"
 description = """The TiDB Cloud Lake adapter plugin for dbt"""

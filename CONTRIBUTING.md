@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Welcome to contribute to dbt-tidbcloudlake. Here are some guides for you.
+Welcome to contribute to tidbcloudlake-dbt. Here are some guides for you.
 
 ## Ways to contribute
 
@@ -23,7 +23,7 @@ We love to accept any kinds of contributions, such as:
 
 ## How to format your code
 
-dbt-tidbcloudlake use black to fmt Python. To fmt your code, you need to:
+tidbcloudlake-dbt use black to fmt Python. To fmt your code, you need to:
 
 First, install black
 ```
