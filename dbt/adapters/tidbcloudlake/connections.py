@@ -1,0 +1,276 @@
+from contextlib import contextmanager
+from dataclasses import dataclass
+
+import agate
+import dbt_common.exceptions  # noqa
+
+from dbt.adapters.exceptions.connection import FailedToConnectError
+from dbt.adapters.contracts.connection import AdapterResponse, Connection, Credentials
+from dbt_common.clients.agate_helper import empty_table
+from dbt.adapters.sql import SQLConnectionManager as connection_cls
+from dbt.adapters.events.logging import AdapterLogger  # type: ignore
+from dbt_common.events.functions import warn_or_error
+from dbt.adapters.events.types import AdapterEventWarning
+from dbt_common.ui import line_wrap_message, warning_tag
+from dbt_common.clients.agate_helper import empty_table
+from typing import Optional, Tuple, List, Any
+from urllib.parse import quote_plus, urlencode
+
+from dbt.adapters.tidbcloudlake.connector import connect
+
+from dbt_common.exceptions import (
+    DbtInternalError,
+    DbtRuntimeError,
+    DbtConfigError,
+)
+
+logger = AdapterLogger("tidbcloudlake")
+
+
+@dataclass
+class TiDBCloudLakeAdapterResponse(AdapterResponse):
+    pass
+
+
+@dataclass
+class TiDBCloudLakeCredentials(Credentials):
+    """
+    Defines database specific credentials that get added to
+    profiles.yml to connect to new adapter
+    """
+
+    host: Optional[str] = None
+    port: Optional[int] = None
+    database: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    schema: Optional[str] = None
+    secure: Optional[bool] = None
+    warehouse: Optional[str] = None
+
+    # Add credentials members here, like:
+    # host: str
+    # port: int
+    # username: str
+    # password: str
+
+    _ALIASES = {"dbname": "database", "pass": "password", "user": "username"}
+
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+        self.database = None
+
+    @classmethod
+    def __pre_deserialize__(cls, data):
+        data = super().__pre_deserialize__(data)
+        if "database" not in data:
+            data["database"] = None
+        return data
+
+    def __post_init__(self):
+        # TiDB Cloud Lake classifies database and schema as the same thing
+        self.database = None
+        if self.database is not None and self.database != self.schema:
+            raise DbtRuntimeError(
+                f"    schema: {self.schema} \n"
+                f"    database: {self.database} \n"
+                f"On TiDB Cloud Lake, database must be omitted or have the same value as"
+                f" schema."
+            )
+
+    @property
+    def type(self):
+        """Return name of adapter."""
+        return "tidbcloudlake"
+
+    @property
+    def unique_field(self):
+        """
+        Hashed and included in anonymous telemetry to track adapter adoption.
+        Pick a field that can uniquely identify one team/organization building with this adapter
+        """
+        return self.schema
+
+    def _connection_keys(self):
+        """
+        List of keys to display in the `dbt debug` output.
+        """
+        return ("host", "port", "database", "schema", "user", "warehouse")
+
+
+@dataclass
+class TiDBCloudLakeAdapterResponse(AdapterResponse):
+    query_id: str = ""
+
+
+class TiDBCloudLakeConnectionManager(connection_cls):
+    TYPE = "tidbcloudlake"
+
+    @contextmanager
+    def exception_handler(self, sql: str):
+        """
+        Returns a context manager, that will handle exceptions raised
+        from queries, catch, log, and raise dbt exceptions it knows how to handle.
+        """
+        try:
+            yield
+
+        except Exception as e:
+            logger.debug("Error running SQL: {}".format(sql))
+            logger.debug("Rolling back transaction.")
+            self.rollback_if_open()
+            raise DbtRuntimeError(str(e))
+
+    # except for DML statements where explicitly defined
+    def add_begin_query(self, *args, **kwargs):
+        pass
+
+    def add_commit_query(self, *args, **kwargs):
+        pass
+
+    def begin(self):
+        pass
+
+    def commit(self):
+        pass
+
+    def clear_transaction(self):
+        pass
+
+    @classmethod
+    def build_dsn(cls, credentials) -> str:
+        """
+        Builds a lakesql DSN out of the credentials found in profiles.yml, e.g.
+        lake://user:password@host:port/?sslmode=require
+
+        The DSN deliberately carries no database: the driver logs in against it
+        on connect, which would fail on the first run of a project whose target
+        schema does not exist yet. Every relation the adapter emits is
+        schema-qualified, so the session database is never consulted.
+        """
+        userinfo = quote_plus(credentials.username or "")
+        if credentials.password:
+            userinfo = f"{userinfo}:{quote_plus(credentials.password)}"
+
+        netloc = credentials.host or ""
+        if credentials.port:
+            netloc = f"{netloc}:{credentials.port}"
+
+        args = {"sslmode": "require" if credentials.secure else "disable"}
+        if credentials.warehouse:
+            args["warehouse"] = credentials.warehouse
+
+        return f"lake://{userinfo}@{netloc}/?{urlencode(args)}"
+
+    @classmethod
+    def open(cls, connection):
+        """
+        Receives a connection object and a Credentials object
+        and moves it to the "open" state.
+        """
+        if connection.state == "open":
+            logger.debug("Connection is already open, skipping open.")
+            return connection
+
+        credentials = connection.credentials
+
+        try:
+            if credentials.secure is None:
+                credentials.secure = True
+
+            handle = connect(cls.build_dsn(credentials))
+
+        except Exception as e:
+            logger.debug("Error opening connection: {}".format(e))
+            connection.handle = None
+            connection.state = "fail"
+            raise FailedToConnectError(str(e))
+        connection.state = "open"
+        connection.handle = handle
+        return connection
+
+    @classmethod
+    def get_response(cls, cursor):
+        return TiDBCloudLakeAdapterResponse(
+            _message="{} {}".format("adapter response", cursor.rowcount),
+            rows_affected=cursor.rowcount,
+        )
+
+    def execute(
+            self, sql: str, auto_begin: bool = False, fetch: bool = False, limit: Optional[int] = None
+    ) -> Tuple[AdapterResponse, agate.Table]:
+        # don't apply the query comment here
+        # it will be applied after ';' queries are split
+        _, cursor = self.add_query(sql, auto_begin)
+        response = self.get_response(cursor)
+        # table: rows, column_names=None, column_types=None, row_names=None
+        if fetch:
+            table = self.get_result_from_cursor(cursor, limit)
+        else:
+            table = dbt_common.clients.agate_helper.empty_table()
+        return response, table
+
+    def add_query(self, sql, auto_begin=False, bindings=None, abridge_sql_log=False):
+        connection, cursor = super().add_query(
+            sql, auto_begin, bindings=bindings, abridge_sql_log=abridge_sql_log
+        )
+
+        if cursor is None:
+            conn = self.get_thread_connection()
+            if conn is None or conn.name is None:
+                conn_name = "<None>"
+            else:
+                conn_name = conn.name
+
+            raise Exception(
+                "Tried to run an empty query on model '{}'. If you are "
+                "conditionally running\nsql, eg. in a model hook, make "
+                "sure your `else` clause contains valid sql!\n\n"
+                "Provided SQL:\n{}".format(conn_name, sql)
+            )
+
+        return connection, cursor
+
+    @classmethod
+    def get_status(cls, _):
+        """
+        Returns connection status
+        """
+        return "OK"
+
+    @classmethod
+    def get_credentials(cls, credentials):
+        """
+        Returns TiDB Cloud Lake credentials
+        """
+        return credentials
+
+    def cancel(self, connection):
+        """
+        Gets a connection object and attempts to cancel any ongoing queries.
+        """
+        connection_name = connection.name
+        logger.debug("Cancelling query '{}'", connection_name)
+        connection.handle.close()
+        logger.debug("Cancel query '{}'", connection_name)
+
+    @classmethod
+    def process_results(cls, column_names, rows):
+
+        return [dict(zip(column_names, row)) for row in rows]
+
+    @classmethod
+    def get_result_from_cursor(cls, cursor: Any, limit: Optional[int]) -> agate.Table:
+        data: List[Any] = []
+        column_names: List[str] = []
+
+        if cursor.description is not None:
+            column_names = [col[0] for col in cursor.description]
+            if limit:
+                rows = cursor.fetchmany(limit)
+            else:
+                rows = cursor.fetchall()
+            data = cls.process_results(column_names, rows)
+
+        return dbt_common.clients.agate_helper.table_from_data_flat(data, column_names)

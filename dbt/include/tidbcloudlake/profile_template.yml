@@ -1,0 +1,10 @@
+default:
+  target: dev
+  outputs:
+    dev:
+      type: tidbcloudlake
+      host: [host]
+      port: [port]
+      schema: [schema(Your database)]
+      user: [username]
+      pass: [password]
