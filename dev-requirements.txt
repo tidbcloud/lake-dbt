@@ -17,6 +17,7 @@ pre-commit
 pytest
 pytest-dotenv
 pytest-logbook
+logbook<1.6
 pytest-xdist
 pytz
 tox>=3.13
