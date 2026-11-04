@@ -47,6 +47,7 @@ class TiDBCloudLakeCredentials(Credentials):
     schema: Optional[str] = None
     secure: Optional[bool] = None
     warehouse: Optional[str] = None
+    tls_ca_file: Optional[str] = None
 
     # Add credentials members here, like:
     # host: str
@@ -96,7 +97,7 @@ class TiDBCloudLakeCredentials(Credentials):
         """
         List of keys to display in the `dbt debug` output.
         """
-        return ("host", "port", "database", "schema", "user", "warehouse")
+        return ("host", "port", "database", "schema", "username", "warehouse", "secure", "tls_ca_file")
 
 
 @dataclass
@@ -157,7 +158,13 @@ class TiDBCloudLakeConnectionManager(connection_cls):
         if credentials.port:
             netloc = f"{netloc}:{credentials.port}"
 
-        args = {"sslmode": "require" if credentials.secure else "disable"}
+        # The public DSN builder must share open()'s default, including direct callers.
+        secure = credentials.secure is None or credentials.secure
+        args = {"sslmode": "require" if secure else "disable"}
+        if not secure:
+            logger.warning("TiDB Cloud Lake TLS is explicitly disabled; credentials and query data use plaintext HTTP")
+        if getattr(credentials, "tls_ca_file", None):
+            args["tls_ca_file"] = credentials.tls_ca_file
         if credentials.warehouse:
             args["warehouse"] = credentials.warehouse
 
