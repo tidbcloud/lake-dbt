@@ -95,3 +95,11 @@ See [tests/README.md](tests/README.md) for details on running the integration te
 ## Contributing
 
 Welcome to contribute for tidbcloudlake-dbt. See [Contributing Guide](CONTRIBUTING.md) for more information.
+### TLS configuration
+
+Connections default to TLS, including direct calls to `build_dsn`. The Lake
+driver's `sslmode=require` selects HTTPS with certificate and hostname
+verification; it is not libpq's encryption-only mode. For a private CA, set
+`tls_ca_file` to a PEM certificate path in `profiles.yml`. `secure: false` keeps
+the existing local HTTP behavior and emits a warning without credentials.
+`dbt debug` includes `secure` and `tls_ca_file` so the transport choice is visible.

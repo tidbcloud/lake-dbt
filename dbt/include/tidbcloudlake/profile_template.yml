@@ -8,3 +8,4 @@ default:
       schema: [schema(Your database)]
       user: [username]
       pass: [password]
+      secure: true
