@@ -17,10 +17,11 @@ jobs:
         env:
           QUERY_DEFAULT_USER: lake
           QUERY_DEFAULT_PASSWORD: lake
-          MINIO_ENABLED: true
+          # These adapter tests do not exercise object storage. Avoid the retired
+          # MinIO download endpoint used by the image bootstrap.
+          QUERY_STORAGE_TYPE: fs
         ports:
           - 8000:8000
-          - 9000:9000
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,12 +38,29 @@ jobs:
           pip install -r dev-requirements.txt
           pipenv install --dev --skip-lock
 
+      - name: Metadata literal regression tests
+        run: python -m unittest discover -s tests/unit -v
+
       - name: Verify Service Running
         run: |
           cid=$(docker ps -aq --filter "ancestor=datafuselabs/databend:nightly" | head -n1)
           test -n "${cid}"
-          docker logs "${cid}"
-          curl -v http://localhost:8000/v1/health
+          if ! curl --fail --silent --show-error \
+            --retry 30 --retry-all-errors --retry-delay 2 --max-time 5 \
+            --user lake:lake \
+            --header 'Content-Type: application/json' \
+            --data '{"sql":"SELECT 1"}' \
+            http://localhost:8000/v1/query > /tmp/lake-readiness.json; then
+            docker logs "${cid}"
+            exit 1
+          fi
+          python - <<'PYCODE'
+          import json
+          with open("/tmp/lake-readiness.json") as response:
+              result = json.load(response)
+          assert not result.get("error"), result
+          assert result.get("data"), result
+          PYCODE
 
       - name: dbt TiDB Cloud Lake Unit Test Suite
         run: |

@@ -9,3 +9,8 @@
         {{ from_date_or_timestamp }}
         )
 {% endmacro %}
+
+{# Lake string literals support both backslash escapes and doubled quotes. #}
+{% macro tidbcloudlake__string_literal(value) -%}
+'{{ value | replace('\\', '\\\\') | replace("'", "''") }}'
+{%- endmacro %}
