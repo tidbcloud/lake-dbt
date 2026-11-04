@@ -17,7 +17,7 @@
     {% call statement('get_database', fetch_result=True) %}
 select name
 from system.databases
-where name = '{{ database }}'
+where name = {{ tidbcloudlake__string_literal(database) }}
     {% endcall %}
    {% do return(load_result('get_database').table) %}
 {% endmacro %}

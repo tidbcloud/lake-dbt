@@ -37,6 +37,9 @@ jobs:
           pip install -r dev-requirements.txt
           pipenv install --dev --skip-lock
 
+      - name: Metadata literal regression tests
+        run: python -m unittest discover -s tests/unit -v
+
       - name: Verify Service Running
         run: |
           cid=$(docker ps -aq --filter "ancestor=datafuselabs/databend:nightly" | head -n1)

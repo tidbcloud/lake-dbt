@@ -9,7 +9,7 @@
 {% macro tidbcloudlake__get_catalog(information_schema, schemas) -%}
   {%- set schema_filter -%}
     {%- for schema in schemas -%}
-      '{{ schema }}'
+      {{ tidbcloudlake__string_literal(schema) }}
       {%- if not loop.last %}, {% endif -%}
     {%- endfor -%}
   {%- endset -%}

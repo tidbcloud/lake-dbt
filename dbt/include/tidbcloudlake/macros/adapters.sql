@@ -50,9 +50,9 @@ dbt docs: https://docs.getdbt.com/docs/contributing/building-a-new-adapter
       0 as position
     from system.columns
     where
-      table = '{{ relation.identifier }}'
+      table = {{ tidbcloudlake__string_literal(relation.identifier) }}
     {% if relation.schema %}
-      and database = '{{ relation.schema }}'
+      and database = {{ tidbcloudlake__string_literal(relation.schema) }}
     {% endif %}
   {% endcall %}
   {% do return(load_result('get_columns_in_relation').table) %}
@@ -69,7 +69,7 @@ dbt docs: https://docs.getdbt.com/docs/contributing/building-a-new-adapter
       database as schema,
       if(engine = 'VIEW', 'view', 'table') as type
     from system.tables
-    where database = '{{ schema_relation.schema }}'
+    where database = {{ tidbcloudlake__string_literal(schema_relation.schema) }}
   {% endcall %}
   {{ return(load_result('list_relations_without_caching').table) }}
 {% endmacro %}
