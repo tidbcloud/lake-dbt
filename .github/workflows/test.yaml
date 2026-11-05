@@ -65,6 +65,9 @@ jobs:
           assert result.get("data"), result
           PYCODE
 
+      - name: Identifier security integration tests
+        run: python -m pytest -q tests/functional/adapter/test_identifier_security.py
+
       - name: dbt TiDB Cloud Lake Unit Test Suite
         run: |
           python -m pytest -s tests/functional/adapter/unit_testing/test_unit_testing.py

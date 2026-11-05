@@ -19,6 +19,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Optional, Sequence
 
 from tidbcloudlake_driver import BlockingLakeClient
+from dbt.adapters.tidbcloudlake.identifiers import protect_quoted_percents
 from tidbcloudlake_driver import Error, NotSupportedError  # noqa: F401
 
 # PEP 249 module globals
@@ -44,7 +45,7 @@ class ParamEscaper:
         if isinstance(item, bytes):
             item = item.decode("utf-8")
         return "'{}'".format(
-            item.replace("\\", "\\\\").replace("'", "\\'").replace("%", "%%")
+            item.replace("\\", "\\\\").replace("'", "\\'")
         )
 
     def escape_item(self, item):
@@ -160,7 +161,7 @@ class Cursor:
 
     def mogrify(self, query: str, parameters: Optional[Sequence[Any]]) -> str:
         if parameters:
-            query = query % _escaper.escape_args(parameters)
+            query = protect_quoted_percents(query) % _escaper.escape_args(parameters)
         return query
 
     def execute(self, operation: str, parameters: Optional[Sequence[Any]] = None):
@@ -172,8 +173,6 @@ class Cursor:
 
         try:
             query = self.mogrify(operation, parameters)
-            if parameters:
-                query = query.replace("%%", "%")
             return self.inner.execute(query)
         except Exception as e:
             raise Error(str(e)) from e
