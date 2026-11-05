@@ -19,6 +19,7 @@ from dbt_common.utils import executor
 import csv
 import io
 from dbt.adapters.tidbcloudlake.column import TiDBCloudLakeColumn
+from dbt.adapters.tidbcloudlake.identifiers import quote_identifier, unquoted_identifier
 from dbt.adapters.tidbcloudlake.connections import TiDBCloudLakeConnectionManager
 from dbt.adapters.tidbcloudlake.relation import TiDBCloudLakeRelation
 
@@ -93,7 +94,23 @@ class TiDBCloudLakeAdapter(SQLAdapter):
         )
 
     def quote(self, identifier):
-        return "{}".format(identifier)
+        # dbt also quotes the absent catalog in this schema-only adapter.
+        if identifier is None:
+            return None
+        return quote_identifier(identifier)
+
+    @available
+    def quote_as_configured(self, identifier, quote_key):
+        rendered = super().quote_as_configured(identifier, quote_key)
+        if identifier is not None and rendered == identifier:
+            return unquoted_identifier(identifier)
+        return rendered
+
+    @available
+    def quote_seed_column(self, column, quote_config):
+        if quote_config is False:
+            return unquoted_identifier(column)
+        return super().quote_seed_column(column, quote_config)
 
     def check_schema_exists(self, database, schema):
         results = self.execute_macro(

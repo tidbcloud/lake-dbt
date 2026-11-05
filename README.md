@@ -88,6 +88,14 @@ These options are assembled into a lakesql DSN of the form
 [DSN reference](https://github.com/tidbcloud/lakesql#dsn) for the full list of
 supported arguments.
 
+## Identifier quoting
+
+Schema, relation and column names are quoted by default, including CSV seed
+headers. Embedded identifier delimiters are escaped. Explicit `quoting: false`
+and seed `quote_columns: false` still support simple unquoted identifiers;
+names containing SQL syntax require quoting and otherwise fail at compilation.
+Metadata column types are validated as type expressions before rendering SQL.
+
 ## Running Tests
 
 See [tests/README.md](tests/README.md) for details on running the integration tests.

@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from typing import TypeVar, Optional, Dict, Any
 
 from dbt.adapters.base.column import Column
+from dbt.adapters.tidbcloudlake.identifiers import quote_identifier
+from dbt.adapters.tidbcloudlake.data_types import validate_type_expression
 from dbt_common.exceptions import DbtRuntimeError
 
 Self = TypeVar("Self", bound="TiDBCloudLakeColumn")
@@ -9,9 +11,17 @@ Self = TypeVar("Self", bound="TiDBCloudLakeColumn")
 
 @dataclass
 class TiDBCloudLakeColumn(Column):
+    def __post_init__(self):
+        quote_identifier(self.column)
+        self.dtype = validate_type_expression(self.dtype)
+
+    @property
+    def data_type(self):
+        return validate_type_expression(super().data_type)
+
     @property
     def quoted(self) -> str:
-        return '"{}"'.format(self.column)
+        return quote_identifier(self.column)
 
     def is_string(self) -> bool:
         if self.dtype is None:
@@ -55,10 +65,10 @@ class TiDBCloudLakeColumn(Column):
 
     @classmethod
     def numeric_type(cls, dtype: str, precision: Any, scale: Any) -> str:
-        return dtype
+        return validate_type_expression(dtype)
 
     def literal(self, value):
-        return f"CAST({value} AS {self.dtype})"
+        return f"CAST({value} AS {self.data_type})"
 
     def can_expand_to(self, other_column: "Column") -> bool:
         return self.is_string() and other_column.is_string()

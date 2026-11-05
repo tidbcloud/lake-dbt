@@ -3,6 +3,7 @@ from typing import Optional, TypeVar, Any, Type, Dict, Union, Iterator, Tuple, S
 
 from dbt_common.exceptions import CompilationError, DbtDatabaseError, DbtRuntimeError, DbtInternalError
 from dbt.adapters.base.relation import BaseRelation, Policy
+from dbt.adapters.tidbcloudlake.identifiers import quote_identifier, unquoted_identifier
 from dbt.adapters.contracts.relation import (
     Path,
     RelationType,
@@ -11,9 +12,9 @@ from dbt.adapters.contracts.relation import (
 
 @dataclass
 class TiDBCloudLakeQuotePolicy(Policy):
-    database: bool = False
-    schema: bool = False
-    identifier: bool = False
+    database: bool = True
+    schema: bool = True
+    identifier: bool = True
 
 
 @dataclass
@@ -32,7 +33,7 @@ class TiDBCloudLakeRelation(BaseRelation):
     include_policy: TiDBCloudLakeIncludePolicy = field(
         default_factory=lambda: TiDBCloudLakeIncludePolicy()
     )
-    quote_character: str = ""
+    quote_character: str = '"'
 
     def __post_init__(self):
         if self.database != self.schema and self.database:
@@ -64,6 +65,15 @@ class TiDBCloudLakeRelation(BaseRelation):
             }
         )
         return cls.from_dict(kwargs)
+
+    def quoted(self, identifier):
+        return quote_identifier(identifier)
+
+    def _render_iterator(self):
+        for key, part in super()._render_iterator():
+            if part is not None and not self.quote_policy.get_part(key):
+                part = unquoted_identifier(part)
+            yield key, part
 
     def render(self):
         if self.include_policy.database and self.include_policy.schema:
